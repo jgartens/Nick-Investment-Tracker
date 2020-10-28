@@ -6,6 +6,16 @@ from bs4 import BeautifulSoup
 import plotly.figure_factory as ff
 import re
 from geopy.geocoders import Nominatim
+import plotly.express as px
+import geopandas
+import dash   
+import dash_core_components as dcc   
+import dash_html_components as html 
+from dash.dependencies import Input, Output 
+from datetime import date
+import plotly.graph_objects as go
+
+
 
 def searchSalesWeb():
     s = requests.Session()
@@ -107,6 +117,7 @@ def searchTaxAssessor(addresses):
         for d in data:
             datareal.append(d.get_text(strip = True))
         info = {}
+        
         info['Address'] = address
         info['Tax Link'] = "<a href='"+ url +"'>Tax Link</a>"
         for i, j in enumerate(labelsreal):
@@ -181,6 +192,63 @@ def match_address_type(address):
         return None
     return street_address
 
+def createGeocode(address):
+    l = re.search('(\d+)-(\d+)', address)
+    m = re.search('(\d+) ([A-Z]+) ([A-Z][A-Z])([nN][eE][wW])', address)
+    n = re.search('(\d+) ([A-Z]+) ([A-Z]+) ([A-Z][A-Z])([nN][eE][wW])', address)
+    o = re.search('(\d+) ([A-Z]+) ([A-Z]+) ([A-Z][A-Z]).*([nN][eE][wW])', address)
+    p = re.search('(\d+) ([A-Z]+) ([A-Z][A-Z])[A-Z]+([nN][eE][wW])', address)
+    q = re.search('(\d+) ([A-Z]) ([A-Z]+) ([A-Z][A-Z])([nN][eE][wW])', address)
+    r = re.search('(\d+) ([A-Z]+) ([A-Z][A-Z]).*([nN][eE][wW])', address)
+    if l != None:
+        return None
+    if m != None:
+        num = m.group(1)
+        name = m.group(2)
+        type = m.group(3)
+        street_address = num + " " + name + " " + type + " New Orleans LA"
+        #print(street_address + " , m")
+    elif n != None:
+        num = n.group(1)
+        name1 = n.group(2)
+        name2 = n.group(3)
+        type = n.group(4)
+        street_address = num + " " + name1 + " " + name2 + " " + type + " New Orleans LA"
+        #print(street_address + " , n")
+    elif o != None:
+        num = o.group(1)
+        name1 = o.group(2)
+        name2 = o.group(3)
+        type = o.group(4)
+        if type == "WA":
+            type = "Way"
+        street_address = num + " " + name1 + " " + name2 + " " + type + " New Orleans LA"
+        #print(street_address + " , o")
+    elif p != None:
+        num = p.group(1)
+        name = p.group(2)
+        type = p.group(3)
+        if type == "WA":
+            type = "Way"
+        street_address = num + " " + name + " " + type + " New Orleans LA"
+        # print(street_address + " , p")
+    elif q != None:
+        num = q.group(1)
+        dir = q.group(2)
+        name = q.group(3)
+        type = q.group(4)
+        street_address = num + " " + dir + " " + name + " " + type + " New Orleans LA"
+        #print(street_address + " , q")
+    elif r != None:
+        num = r.group(1)
+        name = r.group(2)
+        type = r.group(3)
+        street_address = num + " " + name + " " + type + " New Orleans LA"
+        #print(street_address + " , r")
+    else:
+        return None
+    return street_address
+
 
 df = searchSalesWeb()
 addresses = df['Address']
@@ -188,13 +256,117 @@ dict = searchTaxAssessor(addresses)
 df2 = pd.DataFrame(dict)
 df = df.merge(df2, how = 'left', on = "Address")
 df = df.drop(columns = ['Year'])
-df =df.drop_duplicates(subset=['Address'], keep='first')
-###DISPLAY DATAFRAME AS TABLE
-fig =  ff.create_table(df)
-fig.update_layout(
-    autosize=False,
-    width=4000,
-    height=2000,
+df = df.drop_duplicates(subset=['Address'], keep='first')
+bad_df = df[df['Tax Link'].isnull()]
+df = df.dropna()
+df["Address"] = df.apply(lambda row: createGeocode(row["Address"]), axis= 1)
+print(df["Address"])
+geolocator = Nominatim(user_agent="nick-application")
+df['geo'] = df.apply(lambda row: geolocator.geocode(row['Address']), axis=1)
+df = df.dropna()
+df['lat'] = df.apply(lambda row: geolocator.geocode(row['Address']).latitude, axis=1)
+df['lon'] = df.apply(lambda row: geolocator.geocode(row['Address']).longitude, axis=1)
+
+gdf = geopandas.GeoDataFrame(
+    df, geometry=geopandas.points_from_xy(df.lon, df.lat))
+
+
+
+
+###------------------------------------------------------------------------------------
+#Web App using Bash 
+
+app = dash.Dash(__name__)
+
+
+app.layout = html.Div([
+
+    html.Div(id = 'heading', children= [ 
+        html.H1("Houses For Impedding Auction", style= {'text-align': 'center'}),
+        html.H3("New Orleans"),
+        html.H3(date.today())
+    ]),
+
+    dcc.Dropdown(id="slct_neighborhood",
+                options=[
+                    {"label": "Uptown", "value" : "uptown"},
+                    {"label": "Midcity", "value" : "midcity"},
+                    {"label": "Garden District", "value" : "garden"},
+                    {"label": "Downtown / Remainder", "value" : "downtown"}
+                ],
+                multi=False, 
+                value= "",
+                style={'width': "40%"}
+                ),
+    
+    dcc.Input(
+    id="input_neighborhood",
+    placeholder='Enter a value...',
+    type='text',
+    value=''),
+
+    html.Div(id='output_container', children=[]),
+    html.Br(),
+
+    dcc.Graph(id='houses_for_auction_nola', children=[])
+
+])
+
+@app.callback(
+    [Output(component_id='output_container', component_property='children'),
+    Output(component_id='houses_for_auction_nola', component_property='figure')],
+    [Input(component_id='slct_neighborhood', component_property='value'),
+    Input(component_id='input_neighborhood', component_property='value')]
 )
-fig.write_image("table_plotly.png", scale=2000)
-fig.show()
+def update_graph(neighborhood_choice, neigborhood_input):
+
+    px.set_mapbox_access_token("pk.eyJ1IjoiamdhcnRlbnMiLCJhIjoiY2tndHd0bmZ5MDJkbTJzdGhldDVrdDgydyJ9.5Ols2mna_XccKHQC-XoCvA")
+
+    fig = px.scatter_mapbox(gdf,
+                        lat=gdf.geometry.y,
+                        lon=gdf.geometry.x,
+                        hover_name="Address",
+                        hover_data=["Sheriff's Link", "Tax Link"],
+                        color_discrete_sequence=["green"], 
+                        zoom=8, 
+                        height=800)
+    
+    fig.show()
+   
+
+    return "Hello", fig
+
+
+
+if __name__ == '__main__':
+    app.run_server(debug=True)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+# ##DISPLAY DATAFRAME AS TABLE
+# fig =  ff.create_table(df)
+# fig.update_layout(
+#     autosize=False,
+#     width=4000,
+#     height=2000,
+# )
+# fig.write_image("table_plotly.png", scale=2000)
+# fig.show()

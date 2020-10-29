@@ -3,16 +3,16 @@ Nick's Investment Tracker -->
   
 Installation: 
 
-  --make sure python and anaconda are present on your computer (external downloads)\n
-  $pip install numpy\n
-  $pip install pandas 
-  $pip install requests
-  $pip install beautifulsoup4
-  $pip install regex
-  $pip install geopy
-  $pip install plotly
-  $pip install geopandas
-  $pip intall dash
+  --make sure python and anaconda are present on your computer (external downloads)  
+  $pip install numpy  
+  $pip install pandas  
+  $pip install requests  
+  $pip install beautifulsoup4  
+  $pip install regex  
+  $pip install geopy  
+  $pip install plotly   
+  $pip install geopandas  
+  $pip intall dash  
  
  In the case that other installations are prompted in your terminal, install those as well.
  

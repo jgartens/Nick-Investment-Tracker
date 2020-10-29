@@ -3,8 +3,8 @@ Nick's Investment Tracker -->
   
 Installation: 
 
-  --make sure python and anaconda are present on your computer (external downloads)
-  $pip install numpy
+  --make sure python and anaconda are present on your computer (external downloads)\n
+  $pip install numpy\n
   $pip install pandas 
   $pip install requests
   $pip install beautifulsoup4

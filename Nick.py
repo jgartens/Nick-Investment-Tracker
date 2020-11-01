@@ -7,6 +7,7 @@ import plotly.figure_factory as ff
 import re
 from geopy.geocoders import Nominatim
 import plotly.express as px
+import dash_table
 import geopandas
 import dash   
 import dash_core_components as dcc   
@@ -75,7 +76,7 @@ def searchSalesWeb():
                 value = p.group()
             elif q != None:
                 continue
-            value = value[:40]
+            # value = value[:40]
             info[key] = value
             info["Sheriff's Link"] = "<a href='"+ url +"'>Sheriff's Link</a>"
         df = df.append(info, ignore_index = True)
@@ -252,8 +253,8 @@ def createGeocode(address):
 
 df = searchSalesWeb()
 addresses = df['Address']
-dict = searchTaxAssessor(addresses)
-df2 = pd.DataFrame(dict)
+my_dict = searchTaxAssessor(addresses)
+df2 = pd.DataFrame(my_dict)
 df = df.merge(df2, how = 'left', on = "Address")
 df = df.drop(columns = ['Year'])
 df = df.drop_duplicates(subset=['Address'], keep='first')
@@ -308,13 +309,19 @@ app.layout = html.Div([
     html.Div(id='output_container', children=[]),
     html.Br(),
 
-    dcc.Graph(id='houses_for_auction_nola', children=[])
+    dcc.Graph(id='houses_for_auction_nola', children=[]),
+
+    html.Div(id = "table", children = [
+        html.H2("Properties without Tax Accesor Matches", style= {'color': 'red'}),
+        dcc.Graph(
+        id='bad_table', children = [])])
 
 ])
 
 @app.callback(
     [Output(component_id='output_container', component_property='children'),
-    Output(component_id='houses_for_auction_nola', component_property='figure')],
+    Output(component_id='houses_for_auction_nola', component_property='figure'),
+    Output(component_id='bad_table', component_property='figure')],
     [Input(component_id='slct_neighborhood', component_property='value'),
     Input(component_id='input_neighborhood', component_property='value')]
 )
@@ -328,13 +335,23 @@ def update_graph(neighborhood_choice, neigborhood_input):
                         hover_name="Address",
                         hover_data=["Sheriff's Link", "Tax Link"],
                         color_discrete_sequence=["green"], 
-                        zoom=8, 
+                        zoom=10, 
                         height=800)
-    
-    fig.show()
-   
 
-    return "Hello", fig
+    table = go.Figure(data=[go.Table(
+            columnorder = [1,2,3],
+            columnwidth = [300, 200, 100],
+            header=dict(values= ["Address", "Writ and Appraisal", "Sheriff's Link"],
+            fill_color='paleturquoise',
+            align='left'),
+            cells=dict(values= [bad_df.Address, bad_df["Writ and Appraisal"], bad_df["Sheriff's Link"]],
+            fill_color='lavender',
+            align='left'))])
+
+    fig.show()
+    table.show()
+
+    return "Hello", fig, table
 
 
 
@@ -362,11 +379,11 @@ if __name__ == '__main__':
 
 
 # ##DISPLAY DATAFRAME AS TABLE
-# fig =  ff.create_table(df)
-# fig.update_layout(
+# chart =  ff.create_table(df)
+# chart.update_layout(
 #     autosize=False,
 #     width=4000,
 #     height=2000,
 # )
-# fig.write_image("table_plotly.png", scale=2000)
-# fig.show()
+# chart.write_image("table_plotly.png", scale=2000)
+# chart.show()

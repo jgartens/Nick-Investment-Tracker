@@ -25,6 +25,6 @@ Installation:
  
  ______Note______
  
- Application currently under developement and Dash functionality may not function correctly at the current moment.
+ Application under developement and Dash functionality may not function correctly at the current moment.
  
 
